@@ -37,3 +37,5 @@ class Params:
                                  help='The path of Reg file')
         self.parser.add_argument('--doc-path', type=str, default='./data/doc.csv',
                                  help='The path of doc file')
+        self.parser.add_argument('--max_reg_num', type=int, default='4',
+                                 help='')

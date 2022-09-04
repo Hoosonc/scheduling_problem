@@ -24,7 +24,7 @@ class Trainer:
         self.env = Environment(args, self.init_env)
         self.agent = self.env.agent
         self.model = self.agent.model
-        self.load_params()
+        # self.load_params()
         self.optimizer = opt.Adam(self.model.parameters(), lr=args.lr)
         self.rewards = []
         self.total_time = 0

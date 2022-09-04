@@ -17,46 +17,27 @@ class ActorCritic(torch.nn.Module):
     def __init__(self, in_channels, action_space, agent_id):
         super(ActorCritic, self).__init__()
         self.agent_id = agent_id
-        out_channels = 32
+        out_channels = 10
+        self.f1 = nn.Sequential(nn.Conv2d(in_channels, out_channels, (3, 3), (2, 2), padding=1),
+                                nn.ReLU(),
+                                nn.Conv2d(out_channels, out_channels, (3, 3), (2, 2), padding=1),
+                                nn.ReLU(),
+                                nn.Conv2d(out_channels, out_channels, (3, 3), (2, 2), padding=1),
+                                nn.ReLU())
 
-        self.conv1 = nn.Conv2d(in_channels, out_channels, (3, 3), (2, 2), padding=1)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, (3, 3), (2, 2), padding=1)
-        self.conv3 = nn.Conv2d(out_channels, out_channels, (3, 3), (2, 2), padding=1)
-        # self.conv4 = nn.Conv2d(out_channels, out_channels, (3, 3), (2, 2), padding=1)
+        self.f2 = nn.Sequential(nn.Linear(2, 5),
+                                nn.ReLU())
+        self.num_outputs = action_space
+        self.lstm = nn.LSTMCell(self.num_outputs*10, 128)
 
-        self.lstm = nn.LSTMCell(384, 64)
-
-        num_outputs = action_space
-        # self.std_linear = nn.Linear(64, num_outputs)
-        # self.mean_linear = nn.Linear(64, num_outputs)
-        self.df1_linear = nn.Linear(64, 90)
-        self.df2_linear = nn.Linear(64, 10)
-        self.critic_linear = nn.Linear(64, 1)
-        # self.actor_linear = nn.Linear(64, 1)
+        self.critic_linear = nn.Linear(256, 1)
+        self.actor_linear = nn.Linear(128, self.num_outputs)
+        self.action_dense = nn.Linear(self.num_outputs, 128)
         # self.apply(weights_init)
 
         # self.mean_linear.weight.data = normalized_columns_initializer(
         #     self.mean_linear.weight.data, 10)
         # self.mean_linear.bias.data.fill_(0)
-        # self.std_linear.weight.data = normalized_columns_initializer(
-        #     self.std_linear.weight.data, 10)
-        # self.std_linear.bias.data.fill_(0)
-
-        # self.df1_linear.weight.data = normalized_columns_initializer(
-        #     self.df1_linear.weight.data, 0.01)
-        # self.df1_linear.bias.data.fill_(0)
-
-        # self.df2_linear.weight.data = normalized_columns_initializer(
-        #     self.df2_linear.weight.data, 0.01)
-        # self.df2_linear.bias.data.fill_(0)
-
-        # self.actor_linear.weight.data = normalized_columns_initializer(
-        #     self.actor_linear.weight.data, 0.01)
-        # self.actor_linear.bias.data.fill_(0)
-
-        # self.critic_linear.weight.data = normalized_columns_initializer(
-        #     self.critic_linear.weight.data, 5000)
-        # self.critic_linear.bias.data.fill_(0)
 
         self.lstm.bias_ih.data.fill_(0)
         self.lstm.bias_hh.data.fill_(0)
@@ -64,44 +45,25 @@ class ActorCritic(torch.nn.Module):
 
     def forward(self, inputs):
         inputs, (hx, cx) = inputs
-        x = f.relu(self.conv1(inputs))
-        x = f.relu(self.conv2(x))
-        x = f.relu(self.conv3(x))
-        # x = f.relu(self.conv4(x))
-        x = x.view(-1, x.shape[1] * x.shape[3])
+        x1 = self.f1(inputs[0])
+        x2 = self.f2(inputs[1])
+        x1 = x1.view(-1, x1.shape[1] * x1.shape[3])
+        x2 = x2.view(-1, x2.shape[0] * x2.shape[1])
+        x = torch.cat([x1, x2], dim=1)
         hx, cx = self.lstm(x, (hx, cx))
         x = hx
-        # return self.mean_linear(x), self.std_linear(x), (hx, cx), self.critic_linear(x)
-        return self.df1_linear(x), self.df2_linear(x), (hx, cx), self.critic_linear(x)
+        actor = self.actor_linear(x)
+        action = f.softmax(actor, dim=-1).multinomial(num_samples=1).detach()[0].item()
+        log_pi = f.log_softmax(actor, dim=-1).view(self.num_outputs,)[action]
+        one_hot_a = np.array([0 for i in range(self.num_outputs)], dtype="float32")
+        one_hot_a[action] = 1
+        one_hot_a = self.action_dense(torch.from_numpy(one_hot_a).view(1, 4).to(device))
+        critic_input = torch.cat([x, one_hot_a], dim=1)
+        critic_v = self.critic_linear(critic_input)
+        return action, log_pi, (hx, cx), critic_v
 
     def choose_action(self, inputs):
         s, (hx, cx) = inputs
-        df1, df2, lstm_cells, critic_v = self.forward((s, (hx, cx)))
-        # mean, sigma, lstm_cells, critic_v = self.forward((s, (hx, cx)))
-        df1 = f.softmax(df1, dim=-1)
-        df2 = f.softmax(df2, dim=-1)
-        # sigma = sigma.view(2, )
-        # std = torch.exp(sigma).view(2, )
-        # mean = mean.view(2, )
+        action, log_pi, lstm_cells, critic_v = self.forward((s, (hx, cx)))
 
-        p_index_list = []
-        d_index_list = []
-        # value = 0
-        policy_v = None
-        for i in range(10):
-
-            # p_index = np.random.normal(loc=mean[1].item(), scale=std[1].item(), size=1)[0]
-            # d_index = np.random.normal(loc=mean[0].item(), scale=std[0].item(), size=1)[0]
-            p_index = df1.multinomial(num_samples=1).detach()[0].item()
-            d_index = df2.multinomial(num_samples=1).detach()[0].item()
-            p_index_list.append(p_index)
-            d_index_list.append(d_index)
-            policy_v = -(torch.log(df1[0][p_index]) * torch.log(df2[0][d_index]))
-            # value += (-(sigma[1].item() / 2) - (((p_index-mean[1].item())**2) / (2*std[0].item())))
-            # value += (-(sigma[0].item() / 2) - (((d_index - mean[0].item()) ** 2) / (2 * std[1].item())))
-        # value = value / 10
-        actions = []
-        for j in range(len(p_index_list)):
-            actions.append((p_index_list[j], d_index_list[j]))
-        actions = list(set(actions))
-        return actions, policy_v, lstm_cells, critic_v
+        return action, log_pi, lstm_cells, critic_v
