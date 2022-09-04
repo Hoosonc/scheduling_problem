@@ -17,5 +17,5 @@ def check_id(p_list, card_id):
 
 if __name__ == '__main__':
     a = np.array([[1, 2, 3, 4, 0]]).reshape((5, ))
-    for i in a:
-        print(i)
+    b = np.where(a != 0)[0]
+    print(a[b])

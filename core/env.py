@@ -6,6 +6,7 @@
 import random
 import numpy as np
 import torch
+import torch.nn.functional as f
 import matplotlib.pyplot as plt
 import cv2
 
@@ -52,6 +53,8 @@ class Environment:
             is_reg = np.where(self.state[pid-1] == 1)[0]
             if action > len(is_reg):
                 reward -= 1
+                p_pos = 0
+                d_pos = 0
             else:
                 doctor = self.doc_list[is_reg[action]+1]
                 time_block = doctor.time_block
@@ -86,7 +89,6 @@ class Environment:
                 # 随机加一个2到5单位的转换时间
                 last_schedule_list[1][pid-1] = (finish_time + random.randint(2, 5))
 
-                self.task_num -= 1
                 reward += 1
 
                 time_span = abs((start_time - last_time)) + abs((start_time - last_schedule_list[1][pid-1]))
@@ -96,13 +98,27 @@ class Environment:
                 #     reward += 1 + (1 - (time_span / 20))
                 reward += 1 + (1 - (time_span / 20))
 
-                self.update_states(p_index, d_index)
+                self.update_states(pid-1, doctor.doc_id-1)
 
-            self.run_render(p_index, d_index)
-        if self.task_num == 0:
+                if np.where(self.state[pid-1] == 1)[0].tolist():
+                    pass
+                else:
+                    self.pid_list.remove(pid)
+                    self.p_reg_num[0][pid-1] -= 1
+
+                p_pos = pid-1
+                d_pos = doctor.doc_id-1
+
+            self.agent.rewards.append(reward)
+
+            self.run_render(p_pos, d_pos)
+
+        if len(self.pid_list) == 0:
             self.done = True
+        else:
+            self.update_sequence()
 
-        return reward, self.done
+        return self.done
 
     def update_states(self, p_index, d_index):
         self.state[d_index][p_index] = 0
@@ -130,28 +146,11 @@ class Environment:
         self.last_schedule_p = np.zeros((2, self.init_env.p_num))  # 上一个号的结束时间
         self.done = False
 
-    def get_index(self):
-        # actions = self.agent.action.view(-1, ).cpu().numpy()
-        # actions = np.unique(actions)
-        p_index_list = []
-        d_index_list = []
-        actions = self.agent.action
-        for action in actions:
-
-            if action[0] < 0 or action[1] < 0:
-                d_index = -1
-                p_index = -1
-            elif action[0] > (self.init_env.p_num-1) or action[1] > (self.init_env.d_num-1):
-                d_index = -1
-                p_index = -1
-            else:
-                p_index = action[0]
-                d_index = action[1]
-            p_index_list.append(p_index)
-            d_index_list.append(d_index)
-
-        return p_index_list, d_index_list
-        # return p_index, d_index
+    def update_sequence(self):
+        dis_info = np.where(self.p_reg_num[0] != 0)[0]
+        dis_info = dis_info[dis_info]
+        prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).numpy().reshape(-1, ).tolist()
+        self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
 
     def render(self):
         obs = np.ones((10 * 15, 90 * 15, 3))

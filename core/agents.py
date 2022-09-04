@@ -23,6 +23,7 @@ class Agent(object):
         self.state_list = []
         self.agent_id = agent_id
         self.values = []
+        self.rewards = []
         self.critic_values = []
         self.doctor_list = None
         """
@@ -80,7 +81,7 @@ class Agent(object):
         self.action = None
         self.hx = torch.zeros(1, 128).to(device)
         self.cx = torch.zeros(1, 128).to(device)
-        self.action_list = []
-        self.state_list = []
-        self.values = []
-        self.critic_values = []
+        # self.action_list = []
+        # self.state_list = []
+        # self.values = []
+        # self.critic_values = []

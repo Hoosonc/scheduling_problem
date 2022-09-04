@@ -49,11 +49,7 @@ class Trainer:
             for step in range(self.args.num_steps):
                 episode_length += 1
 
-                reward, done = env.step()
-
-                # print(reward)
-                # print(reward, self.agent.action)
-                self.rewards.append(reward)
+                done = env.step()
 
                 done = done or episode_length >= (self.args.num_steps * self.args.update_episode_length)
 
