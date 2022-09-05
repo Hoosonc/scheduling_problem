@@ -59,19 +59,23 @@ class Trainer:
                 if done:
                     print("总时间：", self.env.get_total_time())
                     print("步数：", step+1)
-                    if episode != 0 and (episode + 1) % 100 == 0:
+                    if episode != 0 and (episode + 1) % 20 == 0:
                         self.save_model()
                     episode_length = 0
+                    if (episode+1) % 3 == 0:
+                        self.learn(episode)
+                        self.agent.state_list = []
+                        self.agent.action_list = []
+                        self.agent.values = []
+                        self.agent.critic_values = []
+                        self.agent.rewards = []
                     self.total_time = self.env.get_total_time()
                     self.env.reset()
                     # print("env reset")
                     break
 
-            if (episode+1) % 2 == 0:
-                self.learn(episode)
-
     def learn(self, episode):
-        rewards, log_pi, critic_v, batch, critic_v_next = self.get_batch()
+        rewards, log_pi, critic_v, critic_v_next = self.get_batch()
         td_error = rewards + self.args.gamma * critic_v_next - critic_v
         value_loss = td_error.pow(2).mean()
 
@@ -84,7 +88,7 @@ class Trainer:
 
         loss = policy_loss + self.args.value_loss_coefficient * value_loss
 
-        loss.backward(torch.ones_like(policy_loss), retain_graph=True)
+        loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
         self.optimizer.step()
         # print(loss, episode + 1)
@@ -117,21 +121,13 @@ class Trainer:
         self.model.load_state_dict(torch.load('./net/params/agent1/2022-8-26-16-48-43.pth'))
 
     def get_batch(self):
-        if len(self.agent.state_list) < self.batch:
-            batch = len(self.agent.state_list)
-        else:
-            batch = self.batch
-        random_index = np.random.choice(a=list(range(0, len(self.agent.state_list))), size=batch, replace=False, p=None)
-        rewards = torch.from_numpy(np.array(self.agent.rewards)[random_index]).view(batch, 1).to(device)
-        log_pi = torch.cat([self.agent.values[i].view(1, 1) for i in random_index]).view(batch, 1)
-        critic_v = torch.cat([self.agent.critic_values[i].view(1, 1) for i in random_index]).view(batch, 1)
+        row_len = len(self.agent.rewards)
+        rewards = torch.from_numpy(np.array(self.agent.rewards)).view(row_len, 1).to(device)
+        log_pi = torch.cat([i.view(1, 1) for i in self.agent.values]).view(row_len, 1)
+        critic_v = torch.cat([i.view(1, 1) for i in self.agent.critic_values]).view(row_len, 1)
 
-        # log_pi_next = self.agent.values.copy()
-        # log_pi_next.append(torch.tensor([0.]).to(device))
         critic_v_next = self.agent.critic_values.copy()
         critic_v_next.append(torch.tensor([0.]).to(device))
-        # log_pi_next = torch.cat([log_pi_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
-        critic_v_next = torch.cat([critic_v_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
+        critic_v_next = torch.cat([i.view(1, 1) for i in critic_v_next[1:]]).view(row_len, 1)
 
-        # return rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next
-        return rewards, log_pi, critic_v, batch, critic_v_next
+        return rewards, log_pi, critic_v, critic_v_next

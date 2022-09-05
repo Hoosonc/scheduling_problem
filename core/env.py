@@ -113,7 +113,7 @@ class Environment:
 
             self.agent.rewards.append(reward)
 
-            self.run_render(p_pos, d_pos)
+            # self.run_render(p_pos, d_pos)
 
         if len(self.pid_list) == 0:
             self.done = True
@@ -156,10 +156,6 @@ class Environment:
         dis_info = np.where(self.p_reg_num[0] != 0)[0]
         dis_info = self.p_reg_num[0][dis_info]
         prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).cpu().numpy().reshape(-1, ).tolist()
-        if len(self.pid_list) != len(prob):
-            a = len(self.pid_list)
-            b = len(prob)
-            c = 1
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
 
     def render(self):

@@ -71,6 +71,7 @@ class Agent(object):
             del self.action_list[0]
             del self.values[0]
             del self.critic_values[0]
+            del self.rewards[0]
         self.state_list.append(self.state)
         self.action_list.append(action)
         self.values.append(log_pi)
