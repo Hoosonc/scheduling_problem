@@ -73,6 +73,7 @@ class Trainer:
     def learn(self, episode):
         rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next = self.get_batch()
         delta = rewards + self.args.gamma * log_pi_next
+        value_loss = delta.pow(2).mean()
 
         u = torch.zeros(1, 1).to(device)
 
