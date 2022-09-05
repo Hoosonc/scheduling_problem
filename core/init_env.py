@@ -18,7 +18,12 @@ class InitEnv:
         self.p_num = self.reg_file.groupby("pid").count().shape[0]
 
         self.state = np.zeros((self.p_num, self.d_num), dtype="float32")
-        self.p_reg_num = np.zeros((1, self.p_num))
+        """
+            p_reg_num:
+                [[第一行是上午的挂号数]
+                 [第二行是下午的挂号数]]
+        """
+        self.p_reg_num = np.zeros((2, self.p_num))
         self.agent = Agent(args, 1)
         self.task_num = self.reg_file.shape[0]
         self.doctors = self.init_doctor_list()
@@ -55,11 +60,14 @@ class InitEnv:
         reg_file = self.reg_file
         for patient in reg_file.values:
             pid = patient[0]
-            self.p_reg_num[0][pid-1] += 1
+            if patient[4] == 0:
+                self.p_reg_num[0][pid-1] += 1
+            else:
+                self.p_reg_num[1][pid - 1] += 1
 
     def reset(self):
         self.state = np.zeros((self.p_num, self.d_num), dtype="float32")
-        self.p_reg_num = np.zeros((1, self.p_num))
+        self.p_reg_num = np.zeros((2, self.p_num))
         self.task_num = self.reg_file.shape[0]
         self.doctors = self.init_doctor_list()
         self.init_state()

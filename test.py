@@ -16,6 +16,7 @@ def check_id(p_list, card_id):
 
 
 if __name__ == '__main__':
-    a = [1, 2, 3, 4]
-    a = a[1:]
-    print(a)
+    a = np.array([1, 2, 3, 4])
+    b = torch.from_numpy(a)
+    c = torch.argmax(b)
+    print(c.item())

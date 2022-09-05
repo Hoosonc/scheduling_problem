@@ -56,6 +56,7 @@ class ActorCritic(torch.nn.Module):
 
         # 考虑改成argmax
         action = f.softmax(actor, dim=-1).multinomial(num_samples=1).detach()[0].item()
+        # action = torch.argmax(f.softmax(actor, dim=-1)).item()
 
         log_pi = f.log_softmax(actor, dim=-1).view(self.num_outputs,)[action]
         one_hot_a = np.array([0 for _ in range(self.num_outputs)], dtype="float32")

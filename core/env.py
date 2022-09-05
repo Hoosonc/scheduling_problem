@@ -89,14 +89,14 @@ class Environment:
                 # 随机加一个2到5单位的转换时间
                 last_schedule_list[1][pid-1] = (finish_time + random.randint(2, 5))
 
-                reward += 1
+                reward += 10
 
                 time_span = abs((start_time - last_time)) + abs((start_time - last_schedule_list[1][pid-1]))
                 # if time_span == 0:
                 #     reward += 1
                 # else:
                 #     reward += 1 + (1 - (time_span / 20))
-                reward += 1 + (1 - (time_span / 20))
+                reward += 1 - (time_span / 10)
 
                 self.update_states(pid-1, doctor.doc_id-1)
                 self.p_reg_num[0][pid - 1] -= 1
@@ -153,8 +153,9 @@ class Environment:
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=None, size=self.pro_p_num)
 
     def update_sequence(self):
-        dis_info = np.where(self.p_reg_num[0] != 0)[0]
-        dis_info = self.p_reg_num[0][dis_info]
+        dis_info = self.p_reg_num[0] * 0.5 + self.p_reg_num[1] * 0.5
+        dis_info_index = np.where(dis_info != 0)[0]
+        dis_info = np.power(dis_info[dis_info_index], 4)
         prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).cpu().numpy().reshape(-1, ).tolist()
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
 

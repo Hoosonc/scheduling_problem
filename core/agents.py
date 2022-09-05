@@ -25,6 +25,8 @@ class Agent(object):
         self.values = []
         self.rewards = []
         self.critic_values = []
+        self.critic_next_values = []
+        self.temp_critic = []
 
         self.doctor_list = None
         """
@@ -76,6 +78,7 @@ class Agent(object):
         self.action_list.append(action)
         self.values.append(log_pi)
         self.critic_values.append(critic_v)
+        self.temp_critic.append(critic_v)
 
     def get_model(self, in_channels, action_space, agent_id):
         torch.manual_seed(self.args.seed)
@@ -87,6 +90,7 @@ class Agent(object):
         self.action = None
         self.hx = torch.zeros(1, 128).to(device)
         self.cx = torch.zeros(1, 128).to(device)
+        self.temp_critic = []
         # self.action_list = []
         # self.state_list = []
         # self.values = []

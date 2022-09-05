@@ -24,7 +24,7 @@ class Trainer:
         self.env = Environment(args, self.init_env)
         self.agent = self.env.agent
         self.model = self.agent.model
-        # self.load_params()
+        self.load_params()
         self.optimizer = opt.Adam(self.model.parameters(), lr=args.lr)
         self.total_time = 0
         self.batch = self.args.batch
@@ -59,25 +59,34 @@ class Trainer:
                 if done:
                     print("总时间：", self.env.get_total_time())
                     print("步数：", step+1)
-                    if episode != 0 and (episode + 1) % 20 == 0:
+                    # print("剩余病人：", self.env.pro_p_num)
+                    if episode != 0 and (episode + 1) % 50 == 0:
                         self.save_model()
                     episode_length = 0
-                    if (episode+1) % 3 == 0:
+                    self.agent.temp_critic.append(torch.tensor([0]).to(device))
+                    self.agent.critic_next_values.extend(self.agent.temp_critic[1:])
+                    if len(self.agent.rewards) > 3000:
+                        # if (episode+1) % 3 == 0:
                         self.learn(episode)
                         self.agent.state_list = []
                         self.agent.action_list = []
                         self.agent.values = []
                         self.agent.critic_values = []
                         self.agent.rewards = []
+                        self.agent.critic_next_values = []
                     self.total_time = self.env.get_total_time()
+                    # if (episode+1) % 10 == 0:
+                    #     self.save_data(f"{hxc()}")
+                    # if self.total_time < 1610:
+                    #     self.save_data(f"{hxc()}")
                     self.env.reset()
                     # print("env reset")
                     break
 
     def learn(self, episode):
         rewards, log_pi, critic_v, critic_v_next = self.get_batch()
-        td_error = rewards + self.args.gamma * critic_v_next - critic_v
-        value_loss = td_error.pow(2).mean()
+        td_error = rewards - critic_v
+        value_loss = (0.5*td_error.pow(2)).mean()
 
         delta = rewards + self.args.gamma * critic_v_next - critic_v
 
@@ -118,7 +127,7 @@ class Trainer:
             print(f'保存结果文件')
 
     def load_params(self):
-        self.model.load_state_dict(torch.load('./net/params/agent1/2022-8-26-16-48-43.pth'))
+        self.model.load_state_dict(torch.load('./net/params/agent1/2022-9-5-21-33-31.pth'))
 
     def get_batch(self):
         row_len = len(self.agent.rewards)
