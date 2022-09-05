@@ -58,7 +58,7 @@ class Trainer:
 
                 if done:
                     print("总时间：", self.env.get_total_time())
-
+                    print("步数：", step+1)
                     if episode != 0 and (episode + 1) % 100 == 0:
                         self.save_model()
                     episode_length = 0
@@ -67,43 +67,30 @@ class Trainer:
                     # print("env reset")
                     break
 
-            if (episode+1) % 1 == 0:
+            if (episode+1) % 2 == 0:
                 self.learn(episode)
 
     def learn(self, episode):
-        rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next = self.get_batch()
-        delta = rewards + self.args.gamma * log_pi_next
-        value_loss = delta.pow(2).mean()
+        rewards, log_pi, critic_v, batch, critic_v_next = self.get_batch()
+        td_error = rewards + self.args.gamma * critic_v_next - critic_v
+        value_loss = td_error.pow(2).mean()
 
-        u = torch.zeros(1, 1).to(device)
+        delta = rewards + self.args.gamma * critic_v_next - critic_v
 
-        critic_v.append(u)
-        policy_loss = torch.zeros(1, 1).to(device)
-        value_loss = 0
-        gae = (torch.zeros(1, 1)).to(device)
-        for i in reversed(range(len(self.rewards))):
-            u = self.args.gamma * u + self.rewards[i]
-            advantage = u - critic_v[i]  # 每一步的td target
-            value_loss = value_loss + 0.5 * advantage.pow(2)  # td Loss
+        gae = self.args.gamma * self.args.gae_lambda * delta
+        policy_loss = (-log_pi * gae).mean()
 
-            # Generalized Advantage Estimation
-            delta_t = self.rewards[i] + self.args.gamma * critic_v[i + 1] - critic_v[i]
-            # delta_t = self.rewards[i] + self.args.gamma * critic_v[i + 1] - mean_c
-            gae = gae * self.args.gamma * self.args.gae_lambda + delta_t
-
-            policy_loss = policy_loss - log_pi[i] * gae
-            # policy_loss = policy_loss - f_s_a_value[i] * critic_v[i]
         self.optimizer.zero_grad()
+
         loss = policy_loss + self.args.value_loss_coefficient * value_loss
-        # loss = policy_loss + value_loss
-        loss.backward(torch.ones_like(policy_loss))
+
+        loss.backward(torch.ones_like(policy_loss), retain_graph=True)
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
         self.optimizer.step()
         # print(loss, episode + 1)
-        if episode != 0 and (episode+1) % 1 == 0:
-            print("policy:", policy_loss, episode+1)
-            print("value:", value_loss, episode+1)
-            # print(loss, episode+1)
+
+        print("policy:", policy_loss, episode+1)
+        print("value:", value_loss, episode+1)
 
         # print('para updated')
 
@@ -135,15 +122,16 @@ class Trainer:
         else:
             batch = self.batch
         random_index = np.random.choice(a=list(range(0, len(self.agent.state_list))), size=batch, replace=False, p=None)
-        rewards = torch.from_numpy(np.array(self.agent.rewards)[random_index]).view(batch, 1)
+        rewards = torch.from_numpy(np.array(self.agent.rewards)[random_index]).view(batch, 1).to(device)
         log_pi = torch.cat([self.agent.values[i].view(1, 1) for i in random_index]).view(batch, 1)
         critic_v = torch.cat([self.agent.critic_values[i].view(1, 1) for i in random_index]).view(batch, 1)
 
-        log_pi_next = self.agent.values.copy()
-        log_pi_next.append(0)
+        # log_pi_next = self.agent.values.copy()
+        # log_pi_next.append(torch.tensor([0.]).to(device))
         critic_v_next = self.agent.critic_values.copy()
-        critic_v_next.append(0)
-        log_pi_next = torch.cat([log_pi_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
+        critic_v_next.append(torch.tensor([0.]).to(device))
+        # log_pi_next = torch.cat([log_pi_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
         critic_v_next = torch.cat([critic_v_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
 
-        return rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next
+        # return rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next
+        return rewards, log_pi, critic_v, batch, critic_v_next

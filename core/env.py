@@ -147,11 +147,19 @@ class Environment:
         self.last_schedule_a = np.zeros((2, self.init_env.p_num))  # 上一个号的结束时间 + 随机移动时间
         self.last_schedule_p = np.zeros((2, self.init_env.p_num))  # 上一个号的结束时间
         self.done = False
+        self.p_reg_num = self.init_env.p_reg_num
+        self.pro_p_num = self.init_env.reg_file.groupby("pid").count().shape[0]
+        self.pid_list = [i for i in range(1, self.init_env.p_num + 1)]
+        self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=None, size=self.pro_p_num)
 
     def update_sequence(self):
         dis_info = np.where(self.p_reg_num[0] != 0)[0]
         dis_info = self.p_reg_num[0][dis_info]
         prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).cpu().numpy().reshape(-1, ).tolist()
+        if len(self.pid_list) != len(prob):
+            a = len(self.pid_list)
+            b = len(prob)
+            c = 1
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
 
     def render(self):

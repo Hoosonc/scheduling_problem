@@ -17,5 +17,5 @@ def check_id(p_list, card_id):
 
 if __name__ == '__main__':
     a = torch.tensor([1., 2., 3., 4.]).view(4, 1)
-    a = a.pow(2).mean()
+    a = a * torch.tensor([1., 2., 3., 4.]).view(4, 1)
     print(a)
