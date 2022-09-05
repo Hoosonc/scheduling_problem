@@ -27,7 +27,7 @@ class Params:
                                  help='max grad norm (default: 50)')
         self.parser.add_argument('--seed', type=int, default=2022,
                                  help='random seed (default: 1)')
-        self.parser.add_argument('--num-steps', type=int, default=500,
+        self.parser.add_argument('--num-steps', type=int, default=40,
                                  help='number of forward steps in A2C (default: 300)')
         self.parser.add_argument('--update-episode-length', type=int, default=6,
                                  help='maximum length of an episode (default: 1)')
@@ -38,4 +38,6 @@ class Params:
         self.parser.add_argument('--doc-path', type=str, default='./data/doc.csv',
                                  help='The path of doc file')
         self.parser.add_argument('--max_reg_num', type=int, default='4',
+                                 help='')
+        self.parser.add_argument('--batch', type=int, default='1000',
                                  help='')

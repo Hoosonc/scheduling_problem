@@ -51,7 +51,7 @@ class Environment:
             self.agent.get_action(self.state, pid, self.doc_list)
             action = self.agent.action
             is_reg = np.where(self.state[pid-1] == 1)[0]
-            if action > len(is_reg):
+            if action >= len(is_reg):
                 reward -= 1
                 p_pos = 0
                 d_pos = 0
@@ -99,12 +99,14 @@ class Environment:
                 reward += 1 + (1 - (time_span / 20))
 
                 self.update_states(pid-1, doctor.doc_id-1)
+                self.p_reg_num[0][pid - 1] -= 1
 
                 if np.where(self.state[pid-1] == 1)[0].tolist():
                     pass
                 else:
                     self.pid_list.remove(pid)
-                    self.p_reg_num[0][pid-1] -= 1
+                    self.pro_p_num -= 1
+                    assert self.pro_p_num == len(self.pid_list)
 
                 p_pos = pid-1
                 d_pos = doctor.doc_id-1
@@ -121,7 +123,7 @@ class Environment:
         return self.done
 
     def update_states(self, p_index, d_index):
-        self.state[d_index][p_index] = 0
+        self.state[p_index][d_index] = 0
 
     def reset_h_c(self):
         self.agent.hx = torch.zeros(1, 128).to(device)
@@ -148,31 +150,32 @@ class Environment:
 
     def update_sequence(self):
         dis_info = np.where(self.p_reg_num[0] != 0)[0]
-        dis_info = dis_info[dis_info]
-        prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).numpy().reshape(-1, ).tolist()
+        dis_info = self.p_reg_num[0][dis_info]
+        prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).cpu().numpy().reshape(-1, ).tolist()
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
 
     def render(self):
-        obs = np.ones((10 * 15, 90 * 15, 3))
-        for i in range(10):
-            for j in range(90):
+        obs = np.ones((90 * 5, 10 * 20, 3))
+        for i in range(90):
+            for j in range(10):
                 # if self.state[:, 2:][i, j] == 0:
                 if self.state[i, j] == 0:
-                    cv2.rectangle(obs, (j*15, i*15), (j*15+15, i*15+15), (0, 0, 0), -1)
+                    cv2.rectangle(obs, (j*20, i*5), (j*20+20, i*5+5), (0, 0, 0), -1)
         if self.pos[0] == self.pos[1] == -1:
             p = 0
             d = 0
         else:
             p = self.pos[0]
             d = self.pos[1]
-        cv2.rectangle(obs, (d * 15, p * 15),
-                      (d * 15 + 15, p * 15 + 15), (0, 0, 255), -1)
+        cv2.rectangle(obs, (d * 20, p * 5),
+                      (d * 20 + 20, p * 5 + 5), (0, 0, 255), -1)
         cv2.imshow('image', obs)
+        cv2.moveWindow("image", 10, 10)
         cv2.waitKey(10)
 
     def run_render(self, p_index, d_index):
         self.pos = [p_index, d_index]
-        plt.imshow(self.agent.state.cpu().reshape((10, 90)))
+        plt.imshow(self.agent.state[0].cpu().reshape((90, 10)))
         plt.xticks([])
         plt.yticks([])
         # plt.show()

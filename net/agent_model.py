@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import numpy as np
-from scipy import stats
-import math
-from net.utils import normalized_columns_initializer, weights_init
+# from scipy import stats
+# import math
+# from net.utils import normalized_columns_initializer, weights_init
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -53,9 +53,12 @@ class ActorCritic(torch.nn.Module):
         hx, cx = self.lstm(x, (hx, cx))
         x = hx
         actor = self.actor_linear(x)
+
+        # 考虑改成argmax
         action = f.softmax(actor, dim=-1).multinomial(num_samples=1).detach()[0].item()
+
         log_pi = f.log_softmax(actor, dim=-1).view(self.num_outputs,)[action]
-        one_hot_a = np.array([0 for i in range(self.num_outputs)], dtype="float32")
+        one_hot_a = np.array([0 for _ in range(self.num_outputs)], dtype="float32")
         one_hot_a[action] = 1
         one_hot_a = self.action_dense(torch.from_numpy(one_hot_a).view(1, 4).to(device))
         critic_input = torch.cat([x, one_hot_a], dim=1)

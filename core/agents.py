@@ -25,6 +25,7 @@ class Agent(object):
         self.values = []
         self.rewards = []
         self.critic_values = []
+
         self.doctor_list = None
         """
             doc_info:
@@ -58,15 +59,19 @@ class Agent(object):
         state = state.astype(np.float32)
         state = torch.from_numpy(state).view(1, state.shape[0], 1, state.shape[1]).to(device)
         self.state = (state, doc_info)
-        self.state_list.append(self.state)
 
     def get_action(self, state, pid, doc_list):
         self.doctor_list = doc_list
         self.get_state(state, pid)
-
         action, log_pi, (self.hx, self.cx), critic_v = self.model.choose_action((self.state, (self.hx, self.cx)))
         # self.action = action.to(device)  # 如果模型里action变成tensor  要加载到gpu
         self.action = action
+        if len(self.state_list) > 10000:
+            del self.state_list[0]
+            del self.action_list[0]
+            del self.values[0]
+            del self.critic_values[0]
+        self.state_list.append(self.state)
         self.action_list.append(action)
         self.values.append(log_pi)
         self.critic_values.append(critic_v)

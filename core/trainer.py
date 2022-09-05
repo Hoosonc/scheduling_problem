@@ -3,8 +3,8 @@
 # @Author : hxc
 # @File : trainer.py
 # @Software : PyCharm
-# import numpy as np
-import math
+import numpy as np
+# import math
 
 from core.env import Environment
 import torch
@@ -26,9 +26,9 @@ class Trainer:
         self.model = self.agent.model
         # self.load_params()
         self.optimizer = opt.Adam(self.model.parameters(), lr=args.lr)
-        self.rewards = []
         self.total_time = 0
-        self.eval_rewards = None
+        self.batch = self.args.batch
+        # self.eval_rewards = None
 
     def train(self):
         env = self.env
@@ -53,44 +53,33 @@ class Trainer:
 
                 done = done or episode_length >= (self.args.num_steps * self.args.update_episode_length)
 
-                # if episode != 0 and (episode + 1) % 1 == 0 and step+1 == self.args.num_steps:
-                #     print("剩余任务:", self.env.task_num, "步数:", step + 1)
-                #     print("总时间：", self.env.get_total_time())
+                assert len(self.agent.values) == len(self.agent.state_list) == \
+                       len(self.agent.action_list) == len(self.agent.critic_values)
 
                 if done:
-                    print("剩余任务:", self.env.task_num, "步数:", step + 1)
                     print("总时间：", self.env.get_total_time())
-                    # if episode != 0 and (episode + 1) % 10 == 0:
-                    #     print("剩余任务:", self.env.task_num, "步数:", step+1)
-                    #     print("总时间：", self.env.get_total_time())
-                    # if episode != 0 and (episode + 1) % 100 == 0:
-                    #     self.save_reward_action("第五次训练_" + str(episode) + "_" + str(step))
 
-                    # if episode != 0 and (episode+1) % 100 == 0:
-                    #     self.save_data("第五次训练_" + str(episode))
-                    #     print("episode:", episode+1)
                     if episode != 0 and (episode + 1) % 100 == 0:
                         self.save_model()
                     episode_length = 0
                     self.total_time = self.env.get_total_time()
-                    self.learn(episode)
                     self.env.reset()
-                    self.rewards = []
                     # print("env reset")
                     break
 
+            if (episode+1) % 1 == 0:
+                self.learn(episode)
+
     def learn(self, episode):
-        critic_v = self.agent.critic_values
-        f_s_a_value = self.agent.values
+        rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next = self.get_batch()
+        delta = rewards + self.args.gamma * log_pi_next
+
         u = torch.zeros(1, 1).to(device)
-        if self.env.task_num != 0:
-            _, _, _, value = self.model((self.agent.state, (self.agent.hx, self.agent.cx)))  # 模型的估计值
-            u = value.detach()
+
         critic_v.append(u)
         policy_loss = torch.zeros(1, 1).to(device)
         value_loss = 0
         gae = (torch.zeros(1, 1)).to(device)
-        # mean_c = torch.cat(critic_v).mean()
         for i in reversed(range(len(self.rewards))):
             u = self.args.gamma * u + self.rewards[i]
             advantage = u - critic_v[i]  # 每一步的td target
@@ -101,7 +90,7 @@ class Trainer:
             # delta_t = self.rewards[i] + self.args.gamma * critic_v[i + 1] - mean_c
             gae = gae * self.args.gamma * self.args.gae_lambda + delta_t
 
-            policy_loss = policy_loss - f_s_a_value[i] * gae
+            policy_loss = policy_loss - log_pi[i] * gae
             # policy_loss = policy_loss - f_s_a_value[i] * critic_v[i]
         self.optimizer.zero_grad()
         loss = policy_loss + self.args.value_loss_coefficient * value_loss
@@ -139,18 +128,21 @@ class Trainer:
     def load_params(self):
         self.model.load_state_dict(torch.load('./net/params/agent1/2022-8-26-16-48-43.pth'))
 
-    def save_reward_action(self, file_name):
-        with open(f'./data/save_data/reward_action/{file_name}.csv', mode='a+',
-                  encoding='utf-8-sig', newline='') as f1:
-            csv_writer = csv.writer(f1)
-            headers = ['reward', 'p_index', 'd_index', "step"]
-            csv_writer.writerow(headers)
-            data_set = []
-            for i in range(len(self.rewards)):
-                for j in range(len(self.agent.action_list[i])):
-                    action = self.agent.action_list[i][j]
-                # action = self.agent.action_list[i].numpy().reshape(2, )
-                    item = [self.rewards[i], action[0], action[1], i]
-                    data_set.append(item)
-            csv_writer.writerows(data_set)
-            print(f'保存reward_action文件')
+    def get_batch(self):
+        if len(self.agent.state_list) < self.batch:
+            batch = len(self.agent.state_list)
+        else:
+            batch = self.batch
+        random_index = np.random.choice(a=list(range(0, len(self.agent.state_list))), size=batch, replace=False, p=None)
+        rewards = torch.from_numpy(np.array(self.agent.rewards)[random_index]).view(batch, 1)
+        log_pi = torch.cat([self.agent.values[i].view(1, 1) for i in random_index]).view(batch, 1)
+        critic_v = torch.cat([self.agent.critic_values[i].view(1, 1) for i in random_index]).view(batch, 1)
+
+        log_pi_next = self.agent.values.copy()
+        log_pi_next.append(0)
+        critic_v_next = self.agent.critic_values.copy()
+        critic_v_next.append(0)
+        log_pi_next = torch.cat([log_pi_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
+        critic_v_next = torch.cat([critic_v_next[i+1].view(1, 1) for i in random_index]).view(batch, 1)
+
+        return rewards, log_pi, critic_v, batch, log_pi_next, critic_v_next

@@ -58,7 +58,7 @@ class InitEnv:
             self.p_reg_num[0][pid-1] += 1
 
     def reset(self):
-        self.state = np.zeros((self.d_num, self.p_num), dtype="float32")
+        self.state = np.zeros((self.p_num, self.d_num), dtype="float32")
         self.p_reg_num = np.zeros((1, self.p_num))
         self.task_num = self.reg_file.shape[0]
         self.doctors = self.init_doctor_list()
