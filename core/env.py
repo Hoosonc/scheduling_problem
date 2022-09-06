@@ -72,8 +72,12 @@ class Environment:
                     if last_schedule_list[1][pid-1] <= last_time:
                         start_time = last_time
                     else:
-                        start_time = last_schedule_list[1][pid-1]
-
+                        if last_schedule_list[1][pid-1] - last_time > 8:
+                            if self.pro_p_num > 5:
+                                reward += 1 - ((last_schedule_list[1][pid-1] - last_time) / 10)
+                                self.agent.rewards.append(reward)
+                                continue
+                        start_time = last_schedule_list[1][pid - 1]
                 pro_time = doctor.avg_pro_time
                 finish_time = start_time + pro_time
                 insert_data = [pid, start_time, pro_time, finish_time]
@@ -89,14 +93,9 @@ class Environment:
                 # 随机加一个2到5单位的转换时间
                 last_schedule_list[1][pid-1] = (finish_time + random.randint(2, 5))
 
-                reward += 10
-
                 time_span = abs((start_time - last_time)) + abs((start_time - last_schedule_list[1][pid-1]))
-                # if time_span == 0:
-                #     reward += 1
-                # else:
-                #     reward += 1 + (1 - (time_span / 20))
-                reward += 1 - (time_span / 10)
+
+                reward += 10 + (1 - (time_span / 10))
 
                 self.update_states(pid-1, doctor.doc_id-1)
                 self.p_reg_num[0][pid - 1] -= 1
@@ -158,6 +157,7 @@ class Environment:
         dis_info = np.power(dis_info[dis_info_index], 4)
         prob = f.softmax(torch.from_numpy(dis_info).to(device), dim=-1).cpu().numpy().reshape(-1, ).tolist()
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=prob, size=self.pro_p_num)
+        # self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=None, size=self.pro_p_num)
 
     def render(self):
         obs = np.ones((90 * 5, 10 * 20, 3))

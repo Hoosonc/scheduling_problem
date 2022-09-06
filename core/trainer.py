@@ -24,7 +24,7 @@ class Trainer:
         self.env = Environment(args, self.init_env)
         self.agent = self.env.agent
         self.model = self.agent.model
-        self.load_params()
+        # self.load_params()
         self.optimizer = opt.Adam(self.model.parameters(), lr=args.lr)
         self.total_time = 0
         self.batch = self.args.batch
@@ -57,16 +57,26 @@ class Trainer:
                        len(self.agent.action_list) == len(self.agent.critic_values)
 
                 if done:
-                    print("总时间：", self.env.get_total_time())
-                    print("步数：", step+1)
-                    # print("剩余病人：", self.env.pro_p_num)
-                    if episode != 0 and (episode + 1) % 50 == 0:
-                        self.save_model()
+                    print("总时间：", self.env.get_total_time(),
+                          "步数：", step+1,
+                          "episode:", episode,
+                          "剩余病人：", self.env.pro_p_num)
+
+                    # if episode != 0 and (episode + 1) % 50 == 0:
+                    #     self.save_model()
                     episode_length = 0
-                    self.agent.temp_critic.append(torch.tensor([0]).to(device))
+                    if self.env.pro_p_num == 0:
+                        self.agent.temp_critic.append(torch.tensor([0]).to(device))
+
+                    else:
+                        pid = np.random.choice(a=self.env.pid_list, p=None, size=1)[0]
+                        self.agent.get_state(self.env.state, pid)
+
+                        _, _, _, critic_v = self.model.choose_action((self.agent.state, (self.agent.hx, self.agent.cx)))
+                        self.agent.temp_critic.append(critic_v)
                     self.agent.critic_next_values.extend(self.agent.temp_critic[1:])
-                    if len(self.agent.rewards) > 3000:
-                        # if (episode+1) % 3 == 0:
+
+                    if len(self.agent.rewards) > 5000:
                         self.learn(episode)
                         self.agent.state_list = []
                         self.agent.action_list = []
@@ -91,7 +101,7 @@ class Trainer:
         delta = rewards + self.args.gamma * critic_v_next - critic_v
 
         gae = self.args.gamma * self.args.gae_lambda * delta
-        policy_loss = (-log_pi * gae).mean()
+        policy_loss = ((-log_pi) * gae).mean()
 
         self.optimizer.zero_grad()
 
@@ -101,9 +111,8 @@ class Trainer:
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
         self.optimizer.step()
         # print(loss, episode + 1)
-
+        print("value:", value_loss, episode + 1)
         print("policy:", policy_loss, episode+1)
-        print("value:", value_loss, episode+1)
 
         # print('para updated')
 
@@ -127,7 +136,7 @@ class Trainer:
             print(f'保存结果文件')
 
     def load_params(self):
-        self.model.load_state_dict(torch.load('./net/params/agent1/2022-9-5-21-33-31.pth'))
+        self.model.load_state_dict(torch.load('./net/params/agent1/2022-9-6-15-33-35.pth'))
 
     def get_batch(self):
         row_len = len(self.agent.rewards)
