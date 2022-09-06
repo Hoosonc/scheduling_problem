@@ -23,7 +23,8 @@ class Environment:
         self.state = self.init_env.state
         self.task_num = self.init_env.task_num
         self.agent.model.train()
-
+        self.max_timespan = 2
+        self.max_remain_patients = 5
         self.p_reg_num = self.init_env.p_reg_num
 
         self.last_time_a = np.zeros((self.init_env.p_num,))   # 上一个号的结束时间
@@ -72,11 +73,19 @@ class Environment:
                     if last_schedule_list[1][pid-1] <= last_time:
                         start_time = last_time
                     else:
-                        if last_schedule_list[1][pid-1] - last_time > 8:
-                            if self.pro_p_num > 5:
+                        if self.pro_p_num > self.max_remain_patients:
+                            if last_schedule_list[1][pid-1] - last_time > self.max_timespan:
                                 reward += 1 - ((last_schedule_list[1][pid-1] - last_time) / 10)
                                 self.agent.rewards.append(reward)
                                 continue
+                        elif 5 < self.pro_p_num < self.max_remain_patients:
+                            self.max_remain_patients = 5
+                            self.max_timespan = 5
+                            if last_schedule_list[1][pid-1] - last_time > 5:
+                                reward += 1 - ((last_schedule_list[1][pid-1] - last_time) / 10)
+                                self.agent.rewards.append(reward)
+                                continue
+
                         start_time = last_schedule_list[1][pid - 1]
                 pro_time = doctor.avg_pro_time
                 finish_time = start_time + pro_time
@@ -150,6 +159,8 @@ class Environment:
         self.pro_p_num = self.init_env.reg_file.groupby("pid").count().shape[0]
         self.pid_list = [i for i in range(1, self.init_env.p_num + 1)]
         self.ordered_pid_list = np.random.choice(a=self.pid_list, replace=False, p=None, size=self.pro_p_num)
+        self.max_timespan = 2
+        self.max_remain_patients = 5
 
     def update_sequence(self):
         dis_info = self.p_reg_num[0] * 0.5 + self.p_reg_num[1] * 0.5
