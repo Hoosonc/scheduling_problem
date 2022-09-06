@@ -13,7 +13,7 @@ class Params:
         self.args = self.parser.parse_args()
 
     def get_parser(self):
-        self.parser.add_argument('--lr', type=float, default=0.001,
+        self.parser.add_argument('--lr', type=float, default=0.0001,
                                  help='learning rate (default: 0.0001)')
         self.parser.add_argument('--gamma', type=float, default=0.9,
                                  help='discount factor for rewards (default: 0.99)')
@@ -27,9 +27,9 @@ class Params:
                                  help='max grad norm (default: 50)')
         self.parser.add_argument('--seed', type=int, default=2022,
                                  help='random seed (default: 1)')
-        self.parser.add_argument('--num-steps', type=int, default=80,
+        self.parser.add_argument('--num-steps', type=int, default=50,
                                  help='number of forward steps in A2C (default: 300)')
-        self.parser.add_argument('--update-episode-length', type=int, default=4,
+        self.parser.add_argument('--update-episode-length', type=int, default=1,
                                  help='maximum length of an episode (default: 1)')
         self.parser.add_argument('--episode', type=int, default=1000,
                                  help='How many episode to train the RL algorithm')

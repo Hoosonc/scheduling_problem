@@ -76,7 +76,7 @@ class Trainer:
                         self.agent.temp_critic.append(critic_v)
                     self.agent.critic_next_values.extend(self.agent.temp_critic[1:])
 
-                    if len(self.agent.rewards) > 5000:
+                    if len(self.agent.rewards) > 10000:
                         self.learn(episode)
                         self.agent.state_list = []
                         self.agent.action_list = []
