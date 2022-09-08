@@ -64,10 +64,11 @@ class ActorCritic(torch.nn.Module):
         one_hot_a = self.action_dense(torch.from_numpy(one_hot_a).view(1, 4).to(device))
         critic_input = torch.cat([x, one_hot_a], dim=1)
         critic_v = self.critic_linear(critic_input)
-        return action, log_pi, (hx, cx), critic_v
+        entropy = -(f.log_softmax(actor, dim=-1) * actor).sum(1, keepdim=True)
+        return action, log_pi, (hx, cx), critic_v, entropy
 
     def choose_action(self, inputs):
         s, (hx, cx) = inputs
-        action, log_pi, lstm_cells, critic_v = self.forward((s, (hx, cx)))
+        action, log_pi, lstm_cells, critic_v, entropy = self.forward((s, (hx, cx)))
 
-        return action, log_pi, lstm_cells, critic_v
+        return action, log_pi, lstm_cells, critic_v, entropy

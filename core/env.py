@@ -124,6 +124,7 @@ class Environment:
             # self.run_render(p_pos, d_pos)
 
         if len(self.pid_list) == 0:
+            self.agent.rewards[-1] += 1000
             self.done = True
         else:
             self.update_sequence()

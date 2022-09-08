@@ -27,7 +27,7 @@ class Agent(object):
         self.critic_values = []
         self.critic_next_values = []
         self.temp_critic = []
-
+        self.entropy = []
         self.doctor_list = None
         """
             doc_info:
@@ -47,7 +47,7 @@ class Agent(object):
                 if doctor.free_pos == 0:
                     time_v = 0.
                 else:
-                    time_v = doctor.schedule_list[3][doctor.free_pos-1]
+                    time_v = doctor.schedule_list[3][doctor.free_pos-1] / 200
                 row = [reg_v, time_v]
                 total_rows.append(row)
         if len(total_rows) < self.args.max_reg_num:
@@ -65,7 +65,7 @@ class Agent(object):
     def get_action(self, state, pid, doc_list):
         self.doctor_list = doc_list
         self.get_state(state, pid)
-        action, log_pi, (self.hx, self.cx), critic_v = self.model.choose_action((self.state, (self.hx, self.cx)))
+        action, log_pi, (self.hx, self.cx), critic_v, entropy = self.model.choose_action((self.state, (self.hx, self.cx)))
         # self.action = action.to(device)  # 如果模型里action变成tensor  要加载到gpu
         self.action = action
         if len(self.state_list) > 10000:
@@ -79,6 +79,7 @@ class Agent(object):
         self.values.append(log_pi)
         self.critic_values.append(critic_v)
         self.temp_critic.append(critic_v)
+        self.entropy.append(entropy)
 
     def get_model(self, in_channels, action_space, agent_id):
         torch.manual_seed(self.args.seed)
@@ -91,7 +92,10 @@ class Agent(object):
         self.hx = torch.zeros(1, 128).to(device)
         self.cx = torch.zeros(1, 128).to(device)
         self.temp_critic = []
-        # self.action_list = []
-        # self.state_list = []
-        # self.values = []
-        # self.critic_values = []
+        self.action_list = []
+        self.state_list = []
+        self.values = []
+        self.critic_values = []
+        self.rewards = []
+        self.critic_next_values = []
+        self.entropy = []

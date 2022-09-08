@@ -58,7 +58,7 @@ class Trainer:
 
                 if done:
                     print("总时间：", self.env.get_total_time(),
-                          "步数：", step+1,
+                          "步数：", step + 1,
                           "episode:", episode,
                           "剩余病人：", self.env.pro_p_num)
 
@@ -72,19 +72,22 @@ class Trainer:
                         pid = np.random.choice(a=self.env.pid_list, p=None, size=1)[0]
                         self.agent.get_state(self.env.state, pid)
 
-                        _, _, _, critic_v = self.model.choose_action((self.agent.state, (self.agent.hx, self.agent.cx)))
+                        _, _, _, critic_v, _ = \
+                            self.model.choose_action((self.agent.state, (self.agent.hx, self.agent.cx)))
                         self.agent.temp_critic.append(critic_v)
                     self.agent.critic_next_values.extend(self.agent.temp_critic[1:])
 
-                    if len(self.agent.rewards) > 10000:
+                    self.learn(episode)
+
+                    """if len(self.agent.rewards) > 8000:
                         self.learn(episode)
                         self.agent.state_list = []
                         self.agent.action_list = []
                         self.agent.values = []
                         self.agent.critic_values = []
                         self.agent.rewards = []
-                        self.agent.critic_next_values = []
-                    self.total_time = self.env.get_total_time()
+                        self.agent.critic_next_values = []"""
+                    # self.total_time = self.env.get_total_time()
                     # if (episode+1) % 10 == 0:
                     #     self.save_data(f"{hxc()}")
                     # if self.total_time < 1610:
@@ -94,14 +97,32 @@ class Trainer:
                     break
 
     def learn(self, episode):
-        rewards, log_pi, critic_v, critic_v_next = self.get_batch()
-        td_error = rewards - critic_v
-        value_loss = (0.5*td_error.pow(2)).mean()
+        # rewards, log_pi, critic_v, critic_v_next = self.get_batch()
+        # log_pi, critic_v, critic_v_next = self.get_batch()
+        r = torch.tensor([0.]).view(1, 1).to(device)
+        value_loss = 0
+        policy_loss = 0
+        gae = (torch.zeros(1, 1)).to(device)
+        for i in reversed(range(len(self.agent.rewards))):
+            r = self.args.gamma * r + self.agent.rewards[i]
+            advantage = self.agent.critic_values[i] - r
+            value_loss = value_loss + 0.5 * advantage.pow(2)  # TD
 
-        delta = rewards + self.args.gamma * critic_v_next - critic_v
+            # Generalized Advantage Estimation
+            delta_t = self.agent.rewards[i] + \
+                self.args.gamma * self.agent.critic_next_values[i] - self.agent.critic_values[i]
+            gae = gae * self.args.gamma * self.args.gae_lambda + delta_t
 
-        gae = self.args.gamma * self.args.gae_lambda * delta
-        policy_loss = ((-log_pi) * gae).mean()
+            policy_loss = policy_loss - self.agent.values[i] * gae.detach()\
+                - self.args.entropy_coefficient * self.agent.entropy[i]
+
+        # td_error = rewards - critic_v
+        # value_loss = (0.5*td_error.pow(2)).mean()
+        #
+        # delta = rewards + self.args.gamma * critic_v_next - critic_v
+        #
+        # gae = self.args.gamma * self.args.gae_lambda * delta
+        # policy_loss = ((-log_pi) * gae).mean()
 
         self.optimizer.zero_grad()
 
@@ -112,7 +133,7 @@ class Trainer:
         self.optimizer.step()
         # print(loss, episode + 1)
         print("value:", value_loss, episode + 1)
-        print("policy:", policy_loss, episode+1)
+        print("policy:", policy_loss, episode + 1)
 
         # print('para updated')
 
@@ -140,12 +161,10 @@ class Trainer:
 
     def get_batch(self):
         row_len = len(self.agent.rewards)
-        rewards = torch.from_numpy(np.array(self.agent.rewards)).view(row_len, 1).to(device)
+        # rewards = torch.from_numpy(np.array(self.agent.rewards)).view(row_len, 1).to(device)
         log_pi = torch.cat([i.view(1, 1) for i in self.agent.values]).view(row_len, 1)
         critic_v = torch.cat([i.view(1, 1) for i in self.agent.critic_values]).view(row_len, 1)
+        critic_v_next = torch.cat([i.view(1, 1) for i in self.agent.critic_next_values]).view(row_len, 1)
 
-        critic_v_next = self.agent.critic_values.copy()
-        critic_v_next.append(torch.tensor([0.]).to(device))
-        critic_v_next = torch.cat([i.view(1, 1) for i in critic_v_next[1:]]).view(row_len, 1)
-
-        return rewards, log_pi, critic_v, critic_v_next
+        # return rewards, log_pi, critic_v, critic_v_next
+        return log_pi, critic_v, critic_v_next

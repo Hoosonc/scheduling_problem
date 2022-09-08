@@ -27,7 +27,7 @@ class Params:
                                  help='max grad norm (default: 50)')
         self.parser.add_argument('--seed', type=int, default=2022,
                                  help='random seed (default: 1)')
-        self.parser.add_argument('--num-steps', type=int, default=50,
+        self.parser.add_argument('--num-steps', type=int, default=30,
                                  help='number of forward steps in A2C (default: 300)')
         self.parser.add_argument('--update-episode-length', type=int, default=1,
                                  help='maximum length of an episode (default: 1)')
